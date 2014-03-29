@@ -96,6 +96,8 @@ enum {
 #define TCP_QUICKACK		12	/* Block/reenable quick acks */
 #define TCP_CONGESTION		13	/* Congestion control algorithm */
 #define TCP_MD5SIG		14	/* TCP MD5 Signature (RFC2385) */
+#define TCP_REORDER		15 /* Reordering Algorithm */
+#define TCP_REORDER_MODE		16	/* meaning of "mode" depends on reorder module */
 
 #define TCPI_OPT_TIMESTAMPS	1
 #define TCPI_OPT_SACK		2
@@ -157,6 +159,11 @@ struct tcp_info
 	__u32	tcpi_rcv_space;
 
 	__u32	tcpi_total_retrans;
+	__u32	tcpi_total_fast_retrans;
+	__u32	tcpi_total_rto_retrans;
+	__u32   tcpi_total_dsacks;
+	__u32	tcpi_dupthresh;
+	__u32	tcpi_last_reor_sample;
 };
 
 /* for TCP_MD5SIG socket option */
@@ -244,6 +251,13 @@ static inline struct tcp_request_sock *tcp_rsk(const struct request_sock *req)
 	return (struct tcp_request_sock *)req;
 }
 
+struct reorder_sample {
+	struct list_head list;
+	u32 seq;
+	int factor;
+	int sample;
+};
+
 struct tcp_sock {
 	/* inet_connection_sock has to be the first member of tcp_sock */
 	struct inet_connection_sock	inet_conn;
@@ -330,6 +344,7 @@ struct tcp_sock {
 	u32	snd_cwnd_clamp; /* Do not allow snd_cwnd to grow above this */
 	u32	snd_cwnd_used;
 	u32	snd_cwnd_stamp;
+    u32 current_cwnd;
 
  	u32	rcv_wnd;	/* Current receiver window		*/
 	u32	write_seq;	/* Tail(+1) of data held in tcp send buffer */
