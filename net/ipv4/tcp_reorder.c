@@ -11,7 +11,7 @@
 #include <linux/list.h>
 #include <net/tcp.h>
 
-int sysctl_tcp_reordering __read_mostly = TCP_FASTRETRANS_THRESH;
+//int sysctl_tcp_reordering __read_mostly = TCP_FASTRETRANS_THRESH;
 
 struct native {
 	u8 reorder_mode;

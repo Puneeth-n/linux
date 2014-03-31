@@ -387,12 +387,23 @@ struct tcp_sock {
 	u32	undo_marker;	/* tracking retrans started here. */
 	int	undo_retrans;	/* number of undoable retransmissions. */
 	u32	total_retrans;	/* Total retransmits for entire connection */
+	u32	total_fast_retrans;	/* Total fast retransmits for entire connection */
+	u32	total_rto_retrans;	/* Total RTO retransmits for entire connection */
+	u32 total_dsacks; /* Total number of DSACKs received */
+
+	u32 last_reor_sample; /* The reordering extent of the last seen reordering event */
 
 	u32	urg_seq;	/* Seq of received urgent pointer */
 	unsigned int		keepalive_time;	  /* time before keep alive takes place */
 	unsigned int		keepalive_intvl;  /* time interval between keep alive probes */
 
 	int			linger2;
+
+/* List to store reordering samples */
+	struct list_head reorder_samples;
+
+/* packets_out on entering disorder state */
+	unsigned int prior_packets_out;
 
 /* Receiver side RTT estimation */
 	struct {
