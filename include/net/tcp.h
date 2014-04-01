@@ -53,9 +53,9 @@ extern void tcp_time_wait(struct sock *sk, int state, int timeo);
 #define MAX_TCP_HEADER	(128 + MAX_HEADER)
 #define MAX_TCP_OPTION_SPACE 40
 
-/* 
+/*
  * Never offer a window over 32767 without using window scaling. Some
- * poor stacks do signed 16bit maths! 
+ * poor stacks do signed 16bit maths!
  */
 #define MAX_TCP_WINDOW		32767U
 
@@ -158,7 +158,7 @@ extern void tcp_time_wait(struct sock *sk, int state, int timeo);
 /*
  *	TCP option
  */
- 
+
 #define TCPOPT_NOP		1	/* Padding */
 #define TCPOPT_EOL		0	/* End of options */
 #define TCPOPT_MSS		2	/* Segment size negotiating */
@@ -300,18 +300,18 @@ extern int			tcp_sendmsg(struct kiocb *iocb, struct socket *sock,
 					    struct msghdr *msg, size_t size);
 extern ssize_t			tcp_sendpage(struct socket *sock, struct page *page, int offset, size_t size, int flags);
 
-extern int			tcp_ioctl(struct sock *sk, 
-					  int cmd, 
+extern int			tcp_ioctl(struct sock *sk,
+					  int cmd,
 					  unsigned long arg);
 
-extern int			tcp_rcv_state_process(struct sock *sk, 
+extern int			tcp_rcv_state_process(struct sock *sk,
 						      struct sk_buff *skb,
 						      struct tcphdr *th,
 						      unsigned len);
 
-extern int			tcp_rcv_established(struct sock *sk, 
+extern int			tcp_rcv_established(struct sock *sk,
 						    struct sk_buff *skb,
-						    struct tcphdr *th, 
+						    struct tcphdr *th,
 						    unsigned len);
 
 extern void			tcp_rcv_space_adjust(struct sock *sk);
@@ -384,16 +384,16 @@ extern void			tcp_enter_loss(struct sock *sk, int how);
 extern void			tcp_clear_retrans(struct tcp_sock *tp);
 extern void			tcp_update_metrics(struct sock *sk);
 
-extern void			tcp_close(struct sock *sk, 
+extern void			tcp_close(struct sock *sk,
 					  long timeout);
 extern unsigned int		tcp_poll(struct file * file, struct socket *sock, struct poll_table_struct *wait);
 
-extern int			tcp_getsockopt(struct sock *sk, int level, 
+extern int			tcp_getsockopt(struct sock *sk, int level,
 					       int optname,
-					       char __user *optval, 
+					       char __user *optval,
 					       int __user *optlen);
-extern int			tcp_setsockopt(struct sock *sk, int level, 
-					       int optname, char __user *optval, 
+extern int			tcp_setsockopt(struct sock *sk, int level,
+					       int optname, char __user *optval,
 					       unsigned int optlen);
 extern int			compat_tcp_getsockopt(struct sock *sk,
 					int level, int optname,
@@ -404,7 +404,7 @@ extern int			compat_tcp_setsockopt(struct sock *sk,
 extern void			tcp_set_keepalive(struct sock *sk, int val);
 extern int			tcp_recvmsg(struct kiocb *iocb, struct sock *sk,
 					    struct msghdr *msg,
-					    size_t len, int nonblock, 
+					    size_t len, int nonblock,
 					    int flags, int *addr_len);
 
 extern void			tcp_parse_options(struct sk_buff *skb,
@@ -450,9 +450,9 @@ extern int			tcp_disconnect(struct sock *sk, int flags);
 
 /* From syncookies.c */
 extern __u32 syncookie_secret[2][16-4+SHA_DIGEST_WORDS];
-extern struct sock *cookie_v4_check(struct sock *sk, struct sk_buff *skb, 
+extern struct sock *cookie_v4_check(struct sock *sk, struct sk_buff *skb,
 				    struct ip_options *opt);
-extern __u32 cookie_v4_init_sequence(struct sock *sk, struct sk_buff *skb, 
+extern __u32 cookie_v4_init_sequence(struct sock *sk, struct sk_buff *skb,
 				     __u16 *mss);
 
 extern __u32 cookie_init_timestamp(struct request_sock *req);
@@ -468,9 +468,9 @@ extern __u32 cookie_v6_init_sequence(struct sock *sk, struct sk_buff *skb,
 extern void __tcp_push_pending_frames(struct sock *sk, unsigned int cur_mss,
 				      int nonagle);
 extern int tcp_may_send_now(struct sock *sk);
-extern int tcp_retransmit_skb(struct sock *, struct sk_buff *);
 extern void tcp_retransmit_timer(struct sock *sk);
-extern void tcp_xmit_retransmit_queue(struct sock *);
+extern int tcp_retransmit_skb(struct sock *, struct sk_buff *, int fast_rexmit);
+extern void tcp_xmit_retransmit_queue(struct sock *, int fast_rexmit);
 extern void tcp_simple_retransmit(struct sock *);
 extern int tcp_trim_head(struct sock *, struct sk_buff *, u32);
 extern int tcp_fragment(struct sock *, struct sk_buff *, u32, unsigned int);
@@ -653,6 +653,68 @@ static inline int tcp_skb_mss(const struct sk_buff *skb)
 	return skb_shinfo(skb)->gso_size;
 }
 
+/*
+ * Interface for adding new TCP segment reordering handlers
+ */
+#define TCP_REORDER_NAME_MAX 16
+#define TCP_REORDER_MAX 128
+#define TCP_REORDER_BUF_MAX  (TCP_REORDER_NAME_MAX*TCP_REORDER_MAX)
+
+#define TCP_REORDER_NON_RESTRICTED 0x1
+
+struct tcp_reorder_ops {
+	struct list_head	list;
+	unsigned long flags;
+
+	/* initialize private data (optional) */
+	void (*init)(struct sock *sk);
+	/* cleanup private data  (optional) */
+	void (*release)(struct sock *sk);
+
+	/* return dupack threshold (required) */
+	u32 (*dupthresh)(struct sock *sk);
+	u32 (*moddupthresh)(struct sock *sk);
+	/* update the mode of operation (required) */
+	void (*update_mode)(struct sock *sk, int val);
+	/* allow cwnd moderation in disorder state [bool] (required) */
+	int allow_moderation;
+	/* allow head timeout to trigger fast recovery [bool] (required) */
+	int allow_head_to;
+
+	/* a new sack'ed segment (optional) */
+	void (*new_sack)(struct sock *sk);
+	/* a non-retransmitted SACK hole was filled (optional) */
+	void (*sack_hole_filled)(struct sock *sk, int flag);
+	/* state machine will start now (optional) */
+	void (*sm_starts)(struct sock *sk, int flag, int acked);
+	/* recovery phase starts (optional) */
+	void (*recovery_starts)(struct sock *sk, int flag);
+	void (*recovery_ends)(struct sock *sk, int flag);
+	/* reordering event with a certain degree was detected (optional) */
+	void (*reorder_detected)(struct sock *sk, int length);
+	/* reordering event with a certain factor was detected (optional) */
+	void (*reorder_detected_factor)(struct sock *sk, int factor);
+	/* a RTO timeout happened (optional) */
+	void (*rto_happened)(struct sock *sk);
+
+	char 		name[TCP_REORDER_NAME_MAX];
+	struct module	*owner;
+};
+
+extern int tcp_register_reorder(struct tcp_reorder_ops *ro);
+extern void tcp_unregister_reorder(struct tcp_reorder_ops *ro);
+extern void tcp_init_reorder(struct sock *sk);
+extern void tcp_cleanup_reorder(struct sock *sk);
+extern int tcp_set_default_reorder(const char *name);
+extern void tcp_get_default_reorder(char *name);
+extern void tcp_get_available_reorder(char *buf, size_t maxlen);
+extern void tcp_get_allowed_reorder(char *buf, size_t maxlen);
+extern int tcp_set_allowed_reorder(char *val);
+extern int tcp_set_reorder(struct sock *sk, const char *name);
+extern u32 tcp_native_dupthresh(struct sock *sk);
+extern struct tcp_reorder_ops tcp_init_reorder_ops;
+extern struct tcp_reorder_ops tcp_native;
+
 /* Events passed to congestion control interface */
 enum tcp_ca_event {
 	CA_EVENT_TX_START,	/* first transmit when no packets in flight */
@@ -829,7 +891,7 @@ extern __u32 tcp_init_cwnd(struct tcp_sock *tp, struct dst_entry *dst);
  */
 static __inline__ __u32 tcp_max_burst(const struct tcp_sock *tp)
 {
-	return tp->reordering;
+	return 3; //tp->reordering;
 }
 
 /* Returns end sequence number of the receiver's advertised window */
@@ -981,16 +1043,16 @@ static inline int tcp_win_from_space(int space)
 		space - (space>>sysctl_tcp_adv_win_scale);
 }
 
-/* Note: caller must be prepared to deal with negative returns */ 
+/* Note: caller must be prepared to deal with negative returns */
 static inline int tcp_space(const struct sock *sk)
 {
 	return tcp_win_from_space(sk->sk_rcvbuf -
 				  atomic_read(&sk->sk_rmem_alloc));
-} 
+}
 
 static inline int tcp_full_space(const struct sock *sk)
 {
-	return tcp_win_from_space(sk->sk_rcvbuf); 
+	return tcp_win_from_space(sk->sk_rcvbuf);
 }
 
 static inline void tcp_openreq_init(struct request_sock *req,
