@@ -90,7 +90,7 @@ static int ipv4_sysctl_local_port_range(ctl_table *table,
 	return ret;
 }
 
-static int proc_tcp_reorder(ctl_table *ctl, int write, struct file * filp,
+static int proc_tcp_reorder(ctl_table *ctl, int write,
 				       void __user *buffer, size_t *lenp, loff_t *ppos)
 {
 	char val[TCP_REORDER_NAME_MAX];
@@ -102,7 +102,7 @@ static int proc_tcp_reorder(ctl_table *ctl, int write, struct file * filp,
 
 	tcp_get_default_reorder(val);
 
-	ret = proc_dostring(&tbl, write, filp, buffer, lenp, ppos);
+	ret = proc_dostring(&tbl, write, buffer, lenp, ppos);
 	if (write && ret == 0)
 		ret = tcp_set_default_reorder(val);
 	return ret;
@@ -128,7 +128,7 @@ static int sysctl_tcp_reorder(ctl_table *table,
 }
 
 static int proc_tcp_available_reorder(ctl_table *ctl,
-						 int write, struct file * filp,
+						 int write,
 						 void __user *buffer, size_t *lenp,
 						 loff_t *ppos)
 {
@@ -139,13 +139,13 @@ static int proc_tcp_available_reorder(ctl_table *ctl,
 	if (!tbl.data)
 		return -ENOMEM;
 	tcp_get_available_reorder(tbl.data, TCP_REORDER_BUF_MAX);
-	ret = proc_dostring(&tbl, write, filp, buffer, lenp, ppos);
+	ret = proc_dostring(&tbl, write, buffer, lenp, ppos);
 	kfree(tbl.data);
 	return ret;
 }
 
 static int proc_allowed_reorder(ctl_table *ctl,
-					   int write, struct file * filp,
+					   int write,
 					   void __user *buffer, size_t *lenp,
 					   loff_t *ppos)
 {
@@ -157,7 +157,7 @@ static int proc_allowed_reorder(ctl_table *ctl,
 		return -ENOMEM;
 
 	tcp_get_allowed_reorder(tbl.data, tbl.maxlen);
-	ret = proc_dostring(&tbl, write, filp, buffer, lenp, ppos);
+	ret = proc_dostring(&tbl, write, buffer, lenp, ppos);
 	if (write && ret == 0)
 		ret = tcp_set_allowed_reorder(tbl.data);
 	kfree(tbl.data);
